@@ -6,11 +6,13 @@ import (
 )
 
 func main() {
+	var name string = "赛鹏新"
 	var str string = "saipengxin"
 	var path string = "D:\\saipx\\golang\\day01"
 
 	// 1、len() 获取字符串长度
-	fmt.Printf("字符串长度为 %d 个字符\n",len(str))
+	fmt.Printf("name长度为 %d 个字节\n",len(name))
+	fmt.Printf("str长度为 %d 个字节\n",len(str))
 	fmt.Println("============================")
 
 	// 2、 字符串拼接
