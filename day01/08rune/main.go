@@ -3,10 +3,8 @@ package main
 import "fmt"
 
 func main()  {
-	var a = "哈哈哈"
-	fmt.Println(a)
-	fmt.Println(&a)
-	a = "嘿嘿嘿"
-	fmt.Println(a)
-	fmt.Println(&a)
+	var a = 'a'
+	var b = '赛'
+	fmt.Printf("%T\n",a)
+	fmt.Printf("%T\n",b)
 }
