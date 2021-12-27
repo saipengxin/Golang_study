@@ -4,24 +4,32 @@ import "fmt"
 
 type person struct {
 	name string
+	city string
 	age  int
 }
 
-func main() {
-	var a = new(person)
-	// 因为go允许直接使用结构体指针配合 . 语法来获取成员变量
-	a.name = "saipx"
-	a.age = 15
-
-	fmt.Printf("%#v\n", a)
-	fmt.Printf("%T\n", a)
-
-	var b = new(person)
-	// 给结构体指针初始化，前面要记得带上&,因为b是指针类型的变量，所以等号右边也要是指针类型的数据，所以要使用&
-	b = &person{
-		name: "saipx",
-		age:  15,
+// 构造函数
+func NewPerson(name, city string, age int) *person {
+	return &person{
+		name: name,
+		city: city,
+		age:  age,
 	}
-	fmt.Printf("%#v\n", b)
-	fmt.Printf("%T\n", b)
+}
+
+//方法
+// 前面这个括号是指定的接收者，一般用接收者类型的第一个字母命名
+func (p person) Eating() {
+	fmt.Printf("%s正在吃饭", p.name)
+}
+
+func main() {
+	p := NewPerson("saipx", "北京", 18)
+	fmt.Println(p)
+	// 调用方法，因为指定了接收者为person类型，所以只有person类型的变量才能调用
+	p.Eating()
+
+	// 不能像普通方法一样直接调用
+	// Eating()
+
 }
