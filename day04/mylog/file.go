@@ -61,9 +61,49 @@ func (f *FileLogger) initFile() error {
 
 }
 
-// 定义函数，用来判断当前日志等级是否允许输出
+// 定义方法，用来判断当前日志等级是否允许输出
 func (f *FileLogger) enable(logLevel LogLevel) bool {
 	return logLevel >= f.Lever
+}
+
+// 定义方法，判断是否需要切割
+func (f *FileLogger) checkSize(file *os.File) bool {
+	// 因为我们有两个日志文件，普通日志文件和error级别的日志文件，所以我们要传递文件句柄，根据传递的文件句柄来判断不同的文件，不能直接从接收者f中获取。
+	// 因为我们无法确定取哪个
+	fileInfo, err := file.Stat()
+	if err != nil {
+		fmt.Println("获取文件信息失败")
+		return false
+	}
+	return fileInfo.Size() >= f.maxFileSize
+}
+
+// 定义文件切割方法
+func (f *FileLogger) splitFile(file *os.File) (*os.File, error) {
+	// 还是因为存在不同的日志文件，所以我要传递文件句柄，根据文件句柄来切割不同的文件
+	// 1.根据当前文件句柄，生成备份文件名称 xx.log ==> xx.log.bak20220106172100
+	nowStr := time.Now().Format("20060102150405")
+	fileInfo, err := file.Stat()
+	if err != nil {
+		fmt.Println("获取文件信息失败")
+		return nil, err
+	}
+	logName := path.Join(f.filePath, fileInfo.Name())      // 文件名要实时获取，不同的日志文件名不同，这里获取日志文件的全路径+ 文件名
+	newLogName := fmt.Sprintf("%s.bak%s", logName, nowStr) // 备份的文件路径 + 文件名
+
+	// 2.关闭当前日志
+	file.Close()
+	// 3、将日志备份
+	os.Rename(logName, newLogName)
+	// 4. 打开一个新的日志文件
+	// 我们的logName上一步已经成功改名了，这里直接打开新的logName就可以了
+	fileObj, err := os.OpenFile(logName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("open new log file failed, err:%v\n", err)
+		return nil, err
+	}
+	// 5. 将打开的新日志文件返回
+	return fileObj, nil
 }
 
 // 不同级别的日志中，输出内容的部分重复性太高，这里提取出来封装成方法
@@ -73,10 +113,26 @@ func (f *FileLogger) log(lv LogLevel, format string, a ...interface{}) {
 		msg := fmt.Sprintf(format, a...)
 		now := time.Now().Format("2006-01-02 15:04:05")
 		funcName, fileName, lineNo := getInfo(3)
+		// 判断是否需要切割日志
+		if f.checkSize(f.fileObj) {
+			newFile, err := f.splitFile(f.fileObj)
+			if err != nil {
+				return
+			}
+			f.fileObj = newFile
+		}
 		// getLogString 将日志级别数值转换成字符串
 		// 这里是写入到文件，不再是控制台了
 		fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%s:%d] %s\n", now, getLogString(lv), fileName, funcName, lineNo, msg)
 		if lv >= ERROR {
+			// 判断日志是否需要切割
+			if f.checkSize(f.errFileObj) {
+				newFile, err := f.splitFile(f.errFileObj) // 日志文件
+				if err != nil {
+					return
+				}
+				f.errFileObj = newFile
+			}
 			fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%s:%d] %s\n", now, getLogString(lv), fileName, funcName, lineNo, msg)
 		}
 	}

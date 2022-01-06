@@ -37,10 +37,17 @@ func CopyFile(old_file, new_file string) (written int64, err error) {
 }
 
 func main() {
-	file, err := os.OpenFile("111.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	fileObj, err := os.Open("./new_readme.txt")
+	fmt.Printf("%T\n", fileObj)
 	if err != nil {
-		fmt.Println("错误")
+		fmt.Println("文件打开失败")
 		return
 	}
-	fmt.Fprintf(file, "ssss\n")
+	FileInfo, err := fileObj.Stat()
+	if err != nil {
+		fmt.Println("获取文件信息失败")
+		return
+	}
+	fmt.Println(FileInfo.Name())
+	fmt.Println(FileInfo.Size()) // 单位 byte
 }
