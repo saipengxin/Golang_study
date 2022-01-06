@@ -37,10 +37,10 @@ func CopyFile(old_file, new_file string) (written int64, err error) {
 }
 
 func main() {
-	written, err := CopyFile("readme.txt", "new_readme.txt")
+	file, err := os.OpenFile("111.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println("出错误了：", err)
+		fmt.Println("错误")
 		return
 	}
-	fmt.Printf("拷贝了%d字节", written)
+	fmt.Fprintf(file, "ssss\n")
 }
