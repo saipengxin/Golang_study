@@ -8,6 +8,28 @@ import (
 	"strings"
 )
 
+type Logger interface {
+	Debug(format string, a ...interface{})
+	Trace(format string, a ...interface{})
+	Info(format string, a ...interface{})
+	Warning(format string, a ...interface{})
+	Error(format string, a ...interface{})
+	Fatal(format string, a ...interface{})
+}
+
+// NewLogger 返回Logger类型的数据，因为这Console和file都实现了这个接口，所以既可以返回Console，又可以返回file
+func NewLogger(t, lv string) Logger {
+	var l Logger
+	t = strings.ToLower(t)
+	switch t {
+	case "console":
+		l = NewConsoleLogger(lv)
+	case "file":
+		l = NewFileLogger(lv, "./", "demoLog.log", 10*1024*1024)
+	}
+	return l
+}
+
 // 自定义类型
 type LogLevel uint16
 
