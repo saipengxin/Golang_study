@@ -6,48 +6,59 @@ import (
 	"os"
 )
 
-//
-// CopyFile
-//  @Description: 文件复制
-//  @param old_file 要复制的文件
-//  @param new_file 复制出来的新文件
-//  @return written 拷贝的字节数
-//  @return err 遇到的错误
-//
-func CopyFile(old_file, new_file string) (written int64, err error) {
-	// 以只读的方式打开要复制的文件
-	reader, err := os.Open(old_file)
-	if err != nil {
-		fmt.Printf("打开%s文件出错\n", old_file)
-		return
-	}
-	// 关闭文件
-	defer reader.Close()
-
-	// 以 覆盖，只写的方式打开要复制到的文件，如果没有就创建
-	writer, err := os.OpenFile(new_file, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
-	if err != nil {
-		fmt.Printf("打开%s文件出错\n", new_file)
-		return
-	}
-	defer writer.Close()
-
-	// 复制内容，将reader的内容复制到writer
-	return io.Copy(writer, reader)
-}
-
+// 从 文件的 5字节 后的位置进行内容插入
 func main() {
-	fileObj, err := os.Open("./new_readme.txt")
-	fmt.Printf("%T\n", fileObj)
+	// 打开原文件 只读方式
+	file, err := os.OpenFile("demo.txt", os.O_RDONLY, 0777)
 	if err != nil {
 		fmt.Println("文件打开失败")
 		return
 	}
-	FileInfo, err := fileObj.Stat()
+	defer file.Close()
+
+	// 建立临时文件
+	filetmp, err := os.Create("demo.tmp")
 	if err != nil {
-		fmt.Println("获取文件信息失败")
+		fmt.Println("文件创建失败")
 		return
 	}
-	fmt.Println(FileInfo.Name())
-	fmt.Println(FileInfo.Size()) // 单位 byte
+	defer filetmp.Close()
+
+	// 从原文件读取指定字节内容写入临时文件
+	var b [5]byte
+	n, err := file.Read(b[:])
+	if err != nil {
+		fmt.Println("读取失败1")
+		return
+	}
+	filetmp.Write(b[:n])
+
+	// 将要插入的内容写入临时文件
+	var s = "sai"
+	filetmp.Write([]byte(s))
+
+	// 将原文件的后续内容写入临时文件
+	var x [1024]byte
+	for {
+		// 他会接着上次读取的位置继续读
+		n, err := file.Read(x[:])
+		if err == io.EOF {
+			filetmp.Write(x[:n])
+			fmt.Println("文件读取完成")
+			break
+		}
+		if err != nil {
+			fmt.Println("读取失败2", err)
+			break
+		}
+
+		filetmp.Write(x[:n])
+	}
+
+	// 使用临时文件替换原文件
+	err = os.Rename("demo.tmp", "demo.txt")
+	if err != nil {
+		fmt.Println("失败", err)
+	}
+
 }
