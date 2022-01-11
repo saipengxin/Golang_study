@@ -34,11 +34,10 @@ func Decode(reader *bufio.Reader) (string, error) {
 	// 读取消息的长度
 	// Peek返回输入流的下n个字节，而不会移动读取位置。返回的[]byte只在下一次调用读取操作前合法。
 	lengthByte, _ := reader.Peek(4) // 读取前4个字节的数据
-
 	// NewBuffer使用指定内容作为初始内容创建并初始化一个Buffer
 	lengthBuff := bytes.NewBuffer(lengthByte)
-
 	var length int32
+	// 从缓冲区读取数据并根据小端方式转换
 	err := binary.Read(lengthBuff, binary.LittleEndian, &length)
 	if err != nil {
 		return "", err
@@ -53,5 +52,6 @@ func Decode(reader *bufio.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// 返回的时候只返回真正的数据，将头部4字节的数据长度去除
 	return string(pack[4:]), nil
 }

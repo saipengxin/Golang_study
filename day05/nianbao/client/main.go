@@ -18,8 +18,8 @@ func main() {
 	defer conn.Close()
 	for i := 0; i < 20; i++ {
 		msg := `Hello, Hello. How are you?` + strconv.Itoa(i)
+		// 客户端发送数据前使用Encode函数进行编码
 		data, err := protocol.Encode(msg)
-		fmt.Println(data, 11)
 		if err != nil {
 			fmt.Println("encode msg failed, err:", err)
 			return
