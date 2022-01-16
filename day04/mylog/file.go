@@ -14,7 +14,18 @@ type FileLogger struct {
 	fileName    string   // 日志文件保存的文件名
 	fileObj     *os.File
 	errFileObj  *os.File
-	maxFileSize int64 // 文件切割使用
+	maxFileSize int64        // 文件切割使用
+	logChan     chan *logMsg // 保存日志的通道
+}
+
+// 通道要保存的日志数据
+type logMsg struct {
+	level     LogLevel
+	msg       string
+	funcName  string
+	fileName  string
+	timestamp string
+	line      int
 }
 
 // NewFileLogger 构造函数,接收一个日志等级作为参数
@@ -29,6 +40,7 @@ func NewFileLogger(levelStr, fp, fn string, maxSize int64) *FileLogger {
 		filePath:    fp,
 		fileName:    fn,
 		maxFileSize: maxSize,
+		logChan:     make(chan *logMsg, 10000), // 初始化10000个缓冲空间
 	}
 	// 我们要在初始化的是否就将文件给准备好
 	err = fl.initFile()
@@ -57,6 +69,8 @@ func (f *FileLogger) initFile() error {
 	// 日志文件都已经打开了
 	f.fileObj = fileObj
 	f.errFileObj = errFileObj
+	// 启动一个goroutine
+	go f.writeLogBackground()
 	return nil // 没有错误，就返回nil
 
 }
@@ -106,13 +120,9 @@ func (f *FileLogger) splitFile(file *os.File) (*os.File, error) {
 	return fileObj, nil
 }
 
-// 不同级别的日志中，输出内容的部分重复性太高，这里提取出来封装成方法
-func (f *FileLogger) log(lv LogLevel, format string, a ...interface{}) {
-	if f.enable(lv) {
-		// 字符串和参数拼接在一起才是完整的msg信息，我们这里直接使用原生的Sprintf来进行替换。
-		msg := fmt.Sprintf(format, a...)
-		now := time.Now().Format("2006-01-02 15:04:05")
-		funcName, fileName, lineNo := getInfo(3)
+// 将日志写入文件，提取出来封装一下，启动goroutine后调用这个写入文件
+func (f *FileLogger) writeLogBackground() {
+	for {
 		// 判断是否需要切割日志
 		if f.checkSize(f.fileObj) {
 			newFile, err := f.splitFile(f.fileObj)
@@ -121,19 +131,57 @@ func (f *FileLogger) log(lv LogLevel, format string, a ...interface{}) {
 			}
 			f.fileObj = newFile
 		}
-		// getLogString 将日志级别数值转换成字符串
-		// 这里是写入到文件，不再是控制台了
-		fmt.Fprintf(f.fileObj, "[%s] [%s] [%s:%s:%d] %s\n", now, getLogString(lv), fileName, funcName, lineNo, msg)
-		if lv >= ERROR {
-			// 判断日志是否需要切割
-			if f.checkSize(f.errFileObj) {
-				newFile, err := f.splitFile(f.errFileObj) // 日志文件
-				if err != nil {
-					return
+
+		// 从通道中读取日志内容
+		select {
+		case logTmp := <-f.logChan:
+			// 将日志信息拼接出来
+			logInfo := fmt.Sprintf("[%s] [%s] [%s:%s:%d] %s\n", logTmp.timestamp, getLogString(logTmp.level), logTmp.fileName, logTmp.funcName, logTmp.line, logTmp.msg)
+
+			// getLogString 将日志级别数值转换成字符串
+			// 这里是写入到文件，不再是控制台了
+			fmt.Fprintf(f.fileObj, logInfo)
+			if logTmp.level >= ERROR {
+				// 判断日志是否需要切割
+				if f.checkSize(f.errFileObj) {
+					newFile, err := f.splitFile(f.errFileObj) // 日志文件
+					if err != nil {
+						return
+					}
+					f.errFileObj = newFile
 				}
-				f.errFileObj = newFile
+				fmt.Fprintf(f.errFileObj, logInfo)
 			}
-			fmt.Fprintf(f.errFileObj, "[%s] [%s] [%s:%s:%d] %s\n", now, getLogString(lv), fileName, funcName, lineNo, msg)
+		default:
+			// 取不到日志先休息500毫秒,sleep的时候是会让出cpu的。
+			time.Sleep(time.Millisecond * 500)
+
+		}
+	}
+}
+
+// 不同级别的日志中，输出内容的部分重复性太高，这里提取出来封装成方法
+func (f *FileLogger) log(lv LogLevel, format string, a ...interface{}) {
+	if f.enable(lv) {
+		// 字符串和参数拼接在一起才是完整的msg信息，我们这里直接使用原生的Sprintf来进行替换。
+		msg := fmt.Sprintf(format, a...)
+		now := time.Now().Format("2006-01-02 15:04:05")
+		funcName, fileName, lineNo := getInfo(3)
+
+		// 将日志写入通道
+		// 构造一个logMsg的对象
+		l := &logMsg{
+			level:     lv,
+			msg:       msg,
+			funcName:  funcName,
+			fileName:  fileName,
+			timestamp: now,
+			line:      lineNo,
+		}
+		// 写入通道
+		select {
+		case f.logChan <- l:
+		default:
 		}
 	}
 }
