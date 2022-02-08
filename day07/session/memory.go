@@ -41,10 +41,14 @@ func (m *MemorySession) Get(key string) (value interface{}, err error) {
 	return
 }
 
-func (m *MemorySession) Save() error {
+// Save 接口统一规定要实现Save方法，这个方法redis版本要使用，但是内存版本不需要使用，写个空方法就行
+func (m *MemorySession) Save() (err error) {
 	return nil
 }
 
-func (m *MemorySession) Del(key string) error {
+func (m *MemorySession) Del(key string) (err error) {
+	m.rwlock.Lock()
+	defer m.rwlock.Unlock()
+	delete(m.data, key)
 	return nil
 }
